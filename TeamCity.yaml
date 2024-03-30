@@ -1,0 +1,48 @@
+---
+- name: Setup TeamCity CI Server
+  hosts: ci_server
+  become: yes
+
+  tasks:
+    - name: Install OpenJDK
+      apt:
+        name: openjdk-11-jdk
+        state: present
+
+    - name: Add TeamCity group
+      group:
+        name: teamcity
+        state: present
+
+    - name: Add TeamCity user
+      user:
+        name: teamcity
+        group: teamcity
+        create_home: yes
+
+    - name: Download TeamCity tar.gz
+      get_url:
+        url: "https://download.jetbrains.com/teamcity/TeamCity-{{ teamcity_version }}.tar.gz"
+        dest: "/tmp/TeamCity-{{ teamcity_version }}.tar.gz"
+        mode: '0644'
+      register: download
+
+    - name: Unarchive TeamCity tar.gz
+      unarchive:
+        src: "/tmp/TeamCity-{{ teamcity_version }}.tar.gz"
+        dest: "/opt/teamcity"
+        remote_src: yes
+      when: download.changed
+
+    - name: Update permissions
+      file:
+        path: "/opt/teamcity"
+        owner: teamcity
+        group: teamcity
+        recurse: yes
+
+    - name: Run TeamCity
+      shell: "/opt/teamcity/TeamCity/bin/teamcity-server.sh start"
+      become_user: teamcity
+      async: 45
+      poll: 0
